@@ -15,6 +15,7 @@
 - [📌 Tóm tắt nhanh](#-tóm-tắt-nhanh)
 - [7. Partitioning tables](#7-partitioning-tables)
 - [8. Partition Pruning trong BigQuery](#8-partition-pruning-trong-bigquery)
+- [9. Connect table in database to Google Sheet](#9-connect-table-in-database-to-google-sheet)
 
 ---
 
@@ -455,4 +456,7 @@ Với bảng ingestion-time partitioning, dùng `_PARTITIONTIME` hoặc `_PARTIT
 | Điều kiện để pruning hoạt động? | Cột partition đứng riêng 1 vế so sánh, dùng hằng số hoặc hàm được hỗ trợ, nối `AND` (không `OR`) |
 | Cách đảm bảo mọi query đều pruning? | Bật **Require partition filter** khi tạo bảng |
 | Cách kiểm tra trước khi chạy thật? | Dùng **Dry run** để xem số bytes sẽ quét |
+
+### 9. Connect table in database to Google Sheet
+> Nút **"Open in"** gắn liền với view xem dữ liệu của 1 bảng cụ thể **(Preview/Results của SELECT)(click table trong schema -> Preview -> Open In)**, chứ không xuất hiện ở kết quả của câu lệnh DDL (CREATE TABLE, ALTER TABLE...) vì các lệnh đó không trả về dữ liệu dạng hàng-cột để mở sang Sheets.
 
