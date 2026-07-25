@@ -78,13 +78,13 @@ Sau khi tạo, bạn có thể kiểm tra lại external table trên **BigQuery 
 **Quy trình:**
 
 ```
-Cloud Storage (Data Lake)                      BigQuery (Data Warehouse)
-   dữ liệu Parquet                               bảng standard table
-        │                                                │
-        ▼                                                ▼
-   External Table  ───────────  JOIN  ───────────  Standard Table
-        │
-        ▼
+Cloud Storage (Data Lake)                       BigQuery (Data Warehouse)
+   dữ liệu Parquet                                bảng standard table
+        │                                                  │
+        ▼                                                  ▼
+   External Table  ───────────   JOIN   ───────────  Standard Table
+                                  │
+                                  ▼
    Kết quả: dữ liệu kết hợp từ cả Data Lake + Data Warehouse
 ```
 
