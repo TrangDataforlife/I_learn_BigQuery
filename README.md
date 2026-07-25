@@ -211,13 +211,17 @@ Partition theo ngày + Cluster theo 2 cột.
 a/ Explorer tab để create table: di chuyển đến partition & cluster field (đảm bảo có column phù hợp với partition strategy)
 
 
-b/ classic explorer tab -> query editor
+b/ classic explorer tab -> query editor (Create table as select)
+Đây là cú pháp CTAS — "Create Table As Select": tạo bảng mới và nạp dữ liệu ngay lập tức từ một bảng đã có sẵn, chỉ trong 1 câu lệnh duy nhất.
 ```sql
 CREATE TABLE `shop.orders`
 PARTITION BY DATE(order_date)             -- Partition theo ngày
 CLUSTER BY customer_id, product_category  -- Cluster theo 2 cột
 AS SELECT * FROM `shop.orders_raw`;
 ```
+
+CREATE TABLE \shop.orders` ...` chỉ định nghĩa cấu trúc bảng mới (kèm partition + cluster) — nếu dừng lại ở đó, bảng sẽ rỗng, không có dữ liệu.
+AS SELECT * FROM \shop.orders_raw` mới là phần **lấy dữ liệu** để đổ vào bảng mới đó — lấy toàn bộ (*) dữ liệu từ bảng gốc orders_raw` (bảng chưa partition/cluster).
 
 ### 7.3.2. Sau khi Partition theo `order_date`
 
