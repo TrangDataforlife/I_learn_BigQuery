@@ -9,8 +9,9 @@
 - [4. Kiểm tra nguồn dữ liệu trên giao diện BigQuery](#4-kiểm-tra-nguồn-dữ-liệu-trên-giao-diện-bigquery)
 - [5. Ứng dụng thực tế: Kết hợp Data Lake và Data Warehouse](#5-ứng-dụng-thực-tế-kết-hợp-data-lake-và-data-warehouse)
 - [6. Explorer & Classic Explorer — Kiểm tra Dataset và thêm dữ liệu](#6-explorer--classic-explorer--kiểm-tra-dataset-và-thêm-dữ-liệu)
-  - [6.1. Thêm dữ liệu bằng "+ Add Data"](#61-thêm-dữ-liệu-bằng--add-data)
-  - [6.2. Thêm dữ liệu bằng query](#62-thêm-dữ-liệu-bằng-query)
+  - [6.1. Thêm dữ liệu bằng "+ Add Data" (source từ Google Cloud)](#61-thêm-dữ-liệu-bằng--add-data--source-từ-google-cloud--)
+  - [6.2. Thêm dữ liệu bằng query (source từ Google Cloud)](#62-thêm-dữ-liệu-bằng-query--source-từ-google-cloud--)
+  - [6.3. Thêm dữ liệu bằng query (source từ chính kết quả được tạo ra từ query)](#62-thêm-dữ-liệu-bằng-query--source-từ-chính-kết-quả-được-tạo-ra-từ-query--)
 - [📌 Tóm tắt nhanh](#-tóm-tắt-nhanh)
 - [7. Partitioning tables](#7-partitioning-tables)
 - [8. Partition Pruning trong BigQuery](#8-partition-pruning-trong-bigquery)
@@ -115,7 +116,7 @@ BigQuery Console cung cấp bảng điều hướng (panel) bên trái để duy
 
 > 🔑 **Điểm chính:** Cả 2 giao diện đều dùng để **duyệt và kiểm tra** dataset/table hiện có trong project — Classic Explorer thiên về xem cấu trúc cây, Explorer thiên về thao tác nhanh (tìm kiếm, thêm dữ liệu).
 
-### 6.1. Thêm dữ liệu bằng "+ Add Data"
+### 6.1. Thêm dữ liệu bằng "+ Add Data" (source từ Google Cloud)
 
 Nút **`+ Add Data`** ở Explorer cho phép tạo bảng mới và nạp (load) dữ liệu **trực tiếp vào Data Warehouse** hiện có — khác với External Table (chỉ trỏ tới dữ liệu ngoài, không nạp vào).
 
@@ -135,7 +136,7 @@ Khi chọn nguồn (VD: **Upload**, **Google Cloud Storage**, **Drive**...), c�
 > 🔑 **Điểm chính:** Khác biệt cốt lõi so với mục 1–5 — `+ Add Data` **tạo bảng mới trong dataset hiện có** (nhập/join vào database sẵn có), còn khi chọn **Table type = External table**, kết quả tương đương với việc chạy câu lệnh `CREATE OR REPLACE EXTERNAL TABLE` bằng SQL đã trình bày ở mục 3 — chỉ khác là thao tác qua giao diện thay vì gõ SQL.
 
 ---
-### 6.2. Thêm dữ liệu bằng query
+### 6.2. Thêm dữ liệu bằng query (source từ Google Cloud)
 Thêm state_region table trong fintech schema
 
 ```sql
@@ -148,6 +149,20 @@ region string
 FROM FILES (
 format = 'CSV',
 uris = ['gs://sureskills-lab-dev/future-workforce/da-capstone/temp_35_us/state_region_mapping/state_region_*.csv']);
+```
+
+### 6.3. Thêm dữ liệu bằng query (source từ chính kết quả được tạo ra từ query)
+Tạo bảng loan_with_region bên trong fintech schema
+
+```sql
+CREATE OR REPLACE TABLE fintech.loan_with_region AS
+SELECT
+lo.loan_id,
+lo.loan_amount,
+sr.region
+FROM fintech.loan lo
+INNER JOIN fintech.state_region sr
+ON lo.state = sr.state;
 ```
 
 ## 📌 Tóm tắt nhanh
