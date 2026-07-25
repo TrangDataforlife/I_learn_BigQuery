@@ -11,7 +11,7 @@
 - [6. Explorer & Classic Explorer — Kiểm tra Dataset và thêm dữ liệu](#6-explorer--classic-explorer--kiểm-tra-dataset-và-thêm-dữ-liệu)
   - [6.1. Thêm dữ liệu bằng "+ Add Data" (source từ Google Cloud)](#61-thêm-dữ-liệu-bằng--add-data-source-từ-google-cloud)
   - [6.2. Thêm dữ liệu bằng query (source từ Google Cloud)](#62-thêm-dữ-liệu-bằng-query-source-từ-google-cloud)
-  - [6.3. Thêm dữ liệu bằng query (source từ chính kết quả được tạo ra từ query)](#62-thêm-dữ-liệu-bằng-query-source-từ-chính-kết-quả-được-tạo-ra-từ-query)
+  - [6.3. Thêm dữ liệu bằng query (source từ chính kết quả được tạo ra từ query)](#63-thêm-dữ-liệu-bằng-query-source-từ-chính-kết-quả-được-tạo-ra-từ-query)
 - [📌 Tóm tắt nhanh](#-tóm-tắt-nhanh)
 - [7. Partitioning tables](#7-partitioning-tables)
 - [8. Partition Pruning trong BigQuery](#8-partition-pruning-trong-bigquery)
