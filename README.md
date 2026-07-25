@@ -136,6 +136,7 @@ Khi chọn nguồn (VD: **Upload**, **Google Cloud Storage**, **Drive**...), c�
 
 ---
 ### 6.2. Thêm dữ liệu bằng query
+Thêm state_region table trong fintech schema
 
 ```sql
 LOAD DATA OVERWRITE fintech.state_region
