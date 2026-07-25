@@ -11,6 +11,7 @@
 - [6. Explorer & Classic Explorer — Kiểm tra Dataset và thêm dữ liệu](#6-explorer--classic-explorer--kiểm-tra-dataset-và-thêm-dữ-liệu)
   - [6.1. Thêm dữ liệu bằng "+ Add Data"](#61-thêm-dữ-liệu-bằng--add-data)
 - [📌 Tóm tắt nhanh](#-tóm-tắt-nhanh)
+- [7. Partitioning tables](#7-partitioning-tables)
 
 ---
 
@@ -144,3 +145,110 @@ Khi chọn nguồn (VD: **Upload**, **Google Cloud Storage**, **Drive**...), c�
 | Lợi ích chính? | Kết hợp (JOIN) dữ liệu **data lake** với dữ liệu **data warehouse** mà không cần ETL trước |
 | Xem dataset/table hiện có ở đâu? | Panel **Explorer** hoặc **Classic Explorer** bên trái BigQuery Console |
 | Muốn tạo bảng mới nhập vào dataset sẵn có? | Dùng **`+ Add Data`**, chọn `Table type` = Native table (nạp dữ liệu) hoặc External table (chỉ trỏ nguồn) |
+
+## 7. Partitioning tables
+## 📑 Mục lục
+
+- [7.1. Ba cách Partition Table](#1-ba-cách-partition-table)
+- [7.2. Clustered Table & Clustered Columns](#2-clustered-table--clustered-columns)
+- [7.3. Ví dụ minh họa: Bảng `orders`](#3-ví-dụ-minh-họa-bảng-orders)
+  - [7.3.1. Dữ liệu gốc](#31-dữ-liệu-gốc)
+  - [7.3.2. Sau khi Partition theo `order_date`](#32-sau-khi-partition-theo-order_date)
+  - [7.3.3. Trong mỗi Partition, tiếp tục Cluster](#33-trong-mỗi-partition-tiếp-tục-cluster)
+  - [7.3.4. So sánh hiệu quả quét dữ liệu](#34-so-sánh-hiệu-quả-quét-dữ-liệu)
+  - [7.3.5. Vì sao chọn 2 cột này để minh họa](#35-vì-sao-chọn-2-cột-này-để-minh-họa)
+
+---
+
+## 7.1. Ba cách Partition Table
+
+- **Integer range partitioning** — phân vùng dựa trên một cột **số nguyên** (VD: `customer_id`), chia theo các khoảng giá trị (start, end, interval) do bạn tự định nghĩa.
+- **Time-unit column partitioning** — phân vùng dựa trên một cột **kiểu ngày/giờ** có sẵn trong bảng (VD: cột `order_date`), chia theo ngày/tháng/năm/giờ.
+- **Ingestion time partitioning** — phân vùng tự động theo **thời điểm dữ liệu được nạp (load)** vào bảng, dùng cột ẩn `_PARTITIONTIME` do BigQuery tự sinh ra (không cần bảng có sẵn cột ngày/giờ).
+
+---
+
+## 7.2. Clustered Table & Clustered Columns
+
+- **Clustered table** — bảng có dữ liệu được **sắp xếp/gom nhóm vật lý** theo giá trị của 1 hoặc nhiều cột (tối đa 4 cột), gọi là **clustered columns**.
+- **Clustered columns** — các cột dùng để sắp xếp dữ liệu bên trong mỗi khối lưu trữ (block), thường chọn cột hay dùng trong `WHERE`, `GROUP BY`, `JOIN` (VD: `customer_id`, `product_category`).
+
+**Liên quan gì đến Partition?**
+
+- **Partition** = chia bảng thành các **khối lớn** (theo ngày/số nguyên); **Cluster** = trong mỗi phân vùng, tiếp tục **sắp xếp nhỏ hơn** theo cột chỉ định.
+- Thường **dùng kết hợp**: Partition trước (lọc thô theo ngày) → Cluster sau (lọc tinh trong từng partition) → tăng tốc truy vấn tối đa.
+- Khác partition: Cluster **không tạo phân vùng riêng biệt**, chỉ sắp xếp thứ tự lưu trữ dữ liệu.
+
+**Khi nào dùng?**
+
+- Cột có **quá nhiều giá trị khác nhau (high cardinality)** → không phù hợp làm partition, nhưng phù hợp làm **cluster column** (VD: `customer_id`, `order_id`).
+- Truy vấn thường xuyên **lọc (`WHERE`) hoặc gộp (`GROUP BY`/`JOIN`)** theo cột đó.
+- Bảng đã partition nhưng vẫn quét nhiều dữ liệu trong 1 partition → thêm cluster để thu hẹp thêm.
+
+**Mục tiêu**
+
+- **Giảm dữ liệu quét (bytes scanned)** khi query → **giảm chi phí** và **tăng tốc độ** truy vấn.
+- Không cần khai báo range như partition — BigQuery **tự động** quản lý việc sắp xếp/gom nhóm.
+
+---
+
+## 7.3. Ví dụ minh họa: Bảng `orders`
+
+Partition theo ngày + Cluster theo 2 cột.
+
+### 7.3.1. Dữ liệu gốc
+
+| order_id | order_date | customer_id | product_category | amount |
+|---|---|---|---|---|
+| 101 | 2026-07-01 | C001 | Electronics | 500 |
+| 102 | 2026-07-01 | C045 | Clothing | 80 |
+| 103 | 2026-07-01 | C001 | Electronics | 300 |
+| 104 | 2026-07-02 | C089 | Clothing | 60 |
+| 105 | 2026-07-02 | C001 | Books | 25 |
+| 106 | 2026-07-02 | C045 | Electronics | 700 |
+
+```sql
+CREATE TABLE `shop.orders`
+PARTITION BY DATE(order_date)             -- Partition theo ngày
+CLUSTER BY customer_id, product_category  -- Cluster theo 2 cột
+AS SELECT * FROM `shop.orders_raw`;
+```
+
+### 7.3.2. Sau khi Partition theo `order_date`
+
+BigQuery **tách vật lý** dữ liệu thành từng "khối" riêng theo ngày:
+
+```
+📁 Partition: 2026-07-01              📁 Partition: 2026-07-02
+   101 | C001 | Electronics | 500        104 | C089 | Clothing    | 60
+   102 | C045 | Clothing    | 80         105 | C001 | Books       | 25
+   103 | C001 | Electronics | 300        106 | C045 | Electronics | 700
+```
+
+> 💡 **Vì sao:** Query `WHERE order_date = '2026-07-02'` → BigQuery **chỉ đọc partition ngày 02**, bỏ qua hoàn toàn partition ngày 01 → giảm bytes scanned ngay từ bước lọc thô.
+
+### 7.3.3. Trong mỗi Partition, tiếp tục Cluster
+
+Cluster theo `customer_id`, `product_category`:
+
+```
+📁 Partition: 2026-07-01 (đã sắp xếp theo customer_id → product_category)
+   101 | C001 | Electronics | 500   ┐
+   103 | C001 | Electronics | 300   ┘ gom cạnh nhau vì cùng C001 + Electronics
+   102 | C045 | Clothing    | 80
+```
+
+> 💡 **Vì sao:** Query thêm `AND customer_id = 'C001'` → trong partition 01, dữ liệu của `C001` đã được **xếp liền kề nhau** → BigQuery đọc đúng vùng đó, **bỏ qua** dòng của `C045` mà không cần quét toàn bộ partition.
+
+### 7.3.4. So sánh hiệu quả quét dữ liệu
+
+| Query | Không partition/cluster | Có partition + cluster |
+|---|---|---|
+| `WHERE order_date='2026-07-02' AND customer_id='C001'` | Quét cả 6 dòng | Chỉ quét 1 dòng (`105`) — đúng partition 02, đúng cụm `C001` |
+
+### 7.3.5. Vì sao chọn 2 cột này để minh họa
+
+- `order_date` → làm **partition**: hợp lý vì hầu hết query BI đều lọc theo khoảng ngày (`WHERE order_date BETWEEN ...`), và cột date/timestamp là ứng viên chuẩn cho time-unit partitioning.
+- `customer_id`, `product_category` → làm **cluster**: `customer_id` có **cardinality cao** (rất nhiều giá trị khác nhau) nên không thể partition (partition giới hạn số lượng), nhưng lại **hay xuất hiện trong `WHERE`/`JOIN`** → phù hợp làm cluster column để BigQuery sắp xếp gọn, đọc nhanh mà không cần tạo hàng nghìn partition nhỏ lẻ.
+
+
