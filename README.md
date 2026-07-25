@@ -10,6 +10,7 @@
 - [5. Ứng dụng thực tế: Kết hợp Data Lake và Data Warehouse](#5-ứng-dụng-thực-tế-kết-hợp-data-lake-và-data-warehouse)
 - [6. Explorer & Classic Explorer — Kiểm tra Dataset và thêm dữ liệu](#6-explorer--classic-explorer--kiểm-tra-dataset-và-thêm-dữ-liệu)
   - [6.1. Thêm dữ liệu bằng "+ Add Data"](#61-thêm-dữ-liệu-bằng--add-data)
+  - [6.2. Thêm dữ liệu bằng query](#62-thêm-dữ-liệu-bằng-query)
 - [📌 Tóm tắt nhanh](#-tóm-tắt-nhanh)
 - [7. Partitioning tables](#7-partitioning-tables)
 - [8. Partition Pruning trong BigQuery](#8-partition-pruning-trong-bigquery)
@@ -134,6 +135,18 @@ Khi chọn nguồn (VD: **Upload**, **Google Cloud Storage**, **Drive**...), c�
 > 🔑 **Điểm chính:** Khác biệt cốt lõi so với mục 1–5 — `+ Add Data` **tạo bảng mới trong dataset hiện có** (nhập/join vào database sẵn có), còn khi chọn **Table type = External table**, kết quả tương đương với việc chạy câu lệnh `CREATE OR REPLACE EXTERNAL TABLE` bằng SQL đã trình bày ở mục 3 — chỉ khác là thao tác qua giao diện thay vì gõ SQL.
 
 ---
+### 6.2. Thêm dữ liệu bằng query
+
+LOAD DATA OVERWRITE fintech.state_region
+(
+state string,
+subregion string,
+region string
+)
+FROM FILES (
+format = 'CSV',
+uris = ['gs://sureskills-lab-dev/future-workforce/da-capstone/temp_35_us/state_region_mapping/state_region_*.csv']);
+
 
 ## 📌 Tóm tắt nhanh
 
