@@ -137,6 +137,7 @@ Khi chọn nguồn (VD: **Upload**, **Google Cloud Storage**, **Drive**...), c�
 ---
 ### 6.2. Thêm dữ liệu bằng query
 
+```sql
 LOAD DATA OVERWRITE fintech.state_region
 (
 state string,
@@ -146,7 +147,7 @@ region string
 FROM FILES (
 format = 'CSV',
 uris = ['gs://sureskills-lab-dev/future-workforce/da-capstone/temp_35_us/state_region_mapping/state_region_*.csv']);
-
+```
 
 ## 📌 Tóm tắt nhanh
 
