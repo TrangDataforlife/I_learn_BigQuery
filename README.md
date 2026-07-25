@@ -12,6 +12,7 @@
   - [6.1. Thêm dữ liệu bằng "+ Add Data"](#61-thêm-dữ-liệu-bằng--add-data)
 - [📌 Tóm tắt nhanh](#-tóm-tắt-nhanh)
 - [7. Partitioning tables](#7-partitioning-tables)
+- [8. Partition Pruning trong BigQuery](#8-partition-pruning-trong-bigquery)
 
 ---
 
@@ -260,4 +261,167 @@ Cluster theo `customer_id`, `product_category`:
 - `order_date` → làm **partition**: hợp lý vì hầu hết query BI đều lọc theo khoảng ngày (`WHERE order_date BETWEEN ...`), và cột date/timestamp là ứng viên chuẩn cho time-unit partitioning.
 - `customer_id`, `product_category` → làm **cluster**: `customer_id` có **cardinality cao** (rất nhiều giá trị khác nhau) nên không thể partition (partition giới hạn số lượng), nhưng lại **hay xuất hiện trong `WHERE`/`JOIN`** → phù hợp làm cluster column để BigQuery sắp xếp gọn, đọc nhanh mà không cần tạo hàng nghìn partition nhỏ lẻ.
 
+### 8. Partition Pruning trong BigQuery
+
+## 📑 Mục lục
+
+- [8.1. Partition Pruning là gì?](#1-partition-pruning-là-gì)
+- [8.2. Query theo từng loại Partition](#2-query-theo-từng-loại-partition)
+  - [8.2.1. Time-unit column partitioning](#21-time-unit-column-partitioning)
+  - [8.2.2. Ingestion-time partitioning](#22-ingestion-time-partitioning)
+  - [8.2.3. Integer-range partitioning](#23-integer-range-partitioning)
+- [8.3. Best Practices để Pruning hoạt động đúng](#3-best-practices-để-pruning-hoạt-động-đúng)
+  - [8.3.1. Dùng biểu thức lọc dạng hằng số (constant)](#31-dùng-biểu-thức-lọc-dạng-hằng-số-constant)
+  - [8.3.2. Tách riêng cột partition / chỉ dùng hàm được hỗ trợ](#32-tách-riêng-cột-partition--chỉ-dùng-hàm-được-hỗ-trợ)
+  - [8.3.3. Lọc thêm nhiều cột khác (kết hợp AND)](#33-lọc-thêm-nhiều-cột-khác-kết-hợp-and)
+  - [8.3.4. Bắt buộc filter partition (Require partition filter)](#34-bắt-buộc-filter-partition-require-partition-filter)
+- [📌 Tóm tắt nhanh](#-tóm-tắt-nhanh)
+
+---
+
+## 8.1. Partition Pruning là gì?
+
+**Partition pruning** là cơ chế BigQuery dùng để **loại bỏ (skip)** các partition không liên quan khỏi phạm vi quét, khi query có điều kiện lọc (`WHERE`) đúng trên cột partition.
+
+- Các partition bị loại bỏ **không được tính vào bytes scanned** → **giảm chi phí** query.
+- Cách pruning hoạt động **khác nhau tùy loại partition** (time-unit, ingestion-time, integer-range) → cùng 1 lượng dữ liệu nhưng chọn loại partition khác nhau có thể tốn bytes xử lý khác nhau.
+- Muốn biết chính xác query sẽ quét bao nhiêu bytes trước khi chạy thật → dùng **dry run**.
+
+---
+
+## 8.2. Query theo từng loại Partition
+
+### 8.2.1. Time-unit column partitioning
+
+Lọc trực tiếp trên cột đã dùng làm partition (VD: cột `transaction_date`):
+
+```sql
+SELECT * FROM dataset.table
+WHERE transaction_date >= '2016-01-01'
+```
+
+### 8.2.2. Ingestion-time partitioning
+
+Loại partition này tạo ra 2 **pseudocolumn** (cột ẩn, không phải cột thật trong schema):
+
+| Pseudocolumn | Ý nghĩa |
+|---|---|
+| `_PARTITIONTIME` | Thời điểm nạp dữ liệu (UTC), làm tròn theo cấp partition (giờ/ngày/tháng/năm), kiểu `TIMESTAMP` |
+| `_PARTITIONDATE` | Chỉ có ở bảng partition theo **ngày** — bằng `_PARTITIONTIME` làm tròn về kiểu `DATE` |
+
+```sql
+-- Lọc theo khoảng thời gian trên _PARTITIONTIME
+SELECT column
+FROM dataset.table
+WHERE _PARTITIONTIME BETWEEN TIMESTAMP('2016-01-01') AND TIMESTAMP('2016-01-02')
+```
+
+> ⚠️ **Lưu ý:**
+> - `SELECT *` **không** tự động trả về `_PARTITIONTIME`/`_PARTITIONDATE` — phải `SELECT` tường minh và đặt alias: `SELECT _PARTITIONTIME AS pt, *`.
+> - Dữ liệu đang ở **write-optimized storage** (mới stream vào, chưa commit hẳn vào partition) có `_PARTITIONTIME IS NULL` — muốn query riêng phần này thì lọc `WHERE _PARTITIONTIME IS NULL`.
+> - Nên đặt `_PARTITIONTIME` **một mình** ở một vế của phép so sánh để tối ưu hiệu năng, thay vì bọc nó trong biểu thức cộng/trừ phức tạp.
+
+### 8.2.3. Integer-range partitioning
+
+Lọc trực tiếp trên cột số nguyên đã dùng làm partition:
+
+```sql
+-- Bảng partition theo customer_id:0:100:10 (start:end:interval)
+SELECT * FROM dataset.table
+WHERE customer_id BETWEEN 30 AND 50
+-- Chỉ quét 3 partition bắt đầu từ 30, 40, 50
+```
+
+> ⚠️ Pruning **không hoạt động** nếu áp dụng phép tính lên cột partition:
+> ```sql
+> -- Quét toàn bộ bảng, KHÔNG pruning
+> WHERE customer_id + 1 BETWEEN 30 AND 50
+> ```
+
+---
+
+## 8.3. Best Practices để Pruning hoạt động đúng
+
+### 8.3.1. Dùng biểu thức lọc dạng hằng số (constant)
+
+| Loại biểu thức | Có pruning không? | Ví dụ |
+|---|---|---|
+| **Hằng số (constant)** | ✅ Có | `WHERE t1.ts = CURRENT_TIMESTAMP()` |
+| **Giá trị động (subquery, cột khác)** | ❌ Không | `WHERE t1.ts = (SELECT timestamp FROM table3 WHERE key=2)` |
+| **So sánh với cột khác trong cùng bảng** | ❌ Không | `WHERE ts >= ts2` |
+
+### 8.3.2. Tách riêng cột partition / chỉ dùng hàm được hỗ trợ
+
+Muốn pruning hoạt động, cột partition phải **đứng riêng một mình** ở một vế so sánh, hoặc chỉ được bọc bởi các **hàm được BigQuery hỗ trợ** (tham số khác phải là hằng số):
+
+`DATE_ADD`, `DATE_SUB`, `DATE_DIFF`, `DATE_TRUNC`, `EXTRACT(YEAR/DATE)`, `DATETIME_DIFF`, `TIMESTAMP_ADD`, `TIMESTAMP_SUB`, `TIMESTAMP_DIFF`, `TIMESTAMP_TRUNC`, `FORMAT_TIMESTAMP` (với vài format cụ thể).
+
+```sql
+-- ❌ Chậm hơn: hàm bọc quanh cột nhưng nằm sai vế
+WHERE TIMESTAMP_ADD(_PARTITIONTIME, INTERVAL 5 DAY) > TIMESTAMP('2016-04-15')
+
+-- ✅ Nhanh hơn: cột partition đứng riêng một vế
+WHERE _PARTITIONTIME > TIMESTAMP_SUB(TIMESTAMP('2016-04-15'), INTERVAL 5 DAY)
+```
+
+```sql
+-- ❌ Không pruning: cộng cột partition với 1 cột khác trong bảng
+WHERE _PARTITIONTIME + field1 = TIMESTAMP('2016-03-28')
+
+-- ❌ Không pruning: hàm FORMAT_DATE và phép cộng thời gian không được hỗ trợ
+WHERE FORMAT_DATE('%Y-%m-%d %H', ts) = '2025-03-28 20'
+WHERE ts + INTERVAL 1 DAY > CURRENT_TIMESTAMP()
+
+-- ✅ Viết lại để pruning hoạt động — tách cột partition ra khỏi phép tính
+WHERE ts >= '2025-03-28 20:00:00' AND ts < '2025-03-28 21:00:00'
+WHERE ts > CURRENT_TIMESTAMP() - INTERVAL 1 DAY
+```
+
+> 💡 Nếu hay query lặp lại 1 khoảng thời gian cố định, có thể tạo sẵn **view** lọc theo `_PARTITIONTIME` để tận dụng pruning mỗi lần dùng:
+> ```sql
+> CREATE VIEW dataset.past_week AS
+>   SELECT * FROM dataset.partitioned_table
+>   WHERE _PARTITIONTIME BETWEEN
+>     TIMESTAMP_TRUNC(TIMESTAMP_SUB(CURRENT_TIMESTAMP, INTERVAL 7*24 HOUR), DAY)
+>     AND TIMESTAMP_TRUNC(CURRENT_TIMESTAMP, DAY);
+> ```
+
+### 8.3.3. Lọc thêm nhiều cột khác (kết hợp AND)
+
+Có thể thêm điều kiện lọc trên **các cột khác** cùng lúc với cột partition — pruning vẫn hoạt động, miễn điều kiện trên cột partition đúng chuẩn ở mục 3.2, và các điều kiện được nối bằng **`AND`** (không phải `OR`):
+
+```sql
+-- ✅ Pruning vẫn hoạt động (dù thứ tự predicate không quan trọng)
+WHERE meter_id = 1234
+  AND ts >= '2025-03-28 20:00:00' AND ts < '2025-03-28 21:00:00'
+```
+
+> ⚠️ Nếu đổi `AND` thành `OR` → pruning **mất tác dụng**, vì một partition dù không khớp điều kiện cột partition vẫn có thể chứa dòng thỏa `meter_id = 1234` → buộc phải quét hết.
+
+### 8.3.4. Bắt buộc filter partition (Require partition filter)
+
+Khi tạo bảng, có thể bật tùy chọn **"Require partition filter"** để bắt buộc mọi query phải có `WHERE` lọc theo cột partition — nếu thiếu, BigQuery báo lỗi ngay thay vì âm thầm quét toàn bảng (tốn chi phí).
+
+```sql
+-- ✅ Hợp lệ — có điều kiện lọc thuần trên cột partition
+WHERE partition_id = "20221231"
+WHERE partition_id = "20221231" AND f = "20221130"
+
+-- ❌ Không hợp lệ — điều kiện trên cột partition bị nối bằng OR
+WHERE partition_id = "20221231" OR f = "20221130"
+```
+
+Với bảng ingestion-time partitioning, dùng `_PARTITIONTIME` hoặc `_PARTITIONDATE` để thỏa yêu cầu này.
+
+---
+
+## 📌 Tóm tắt nhanh
+
+| Câu hỏi | Trả lời |
+|---|---|
+| Partition pruning là gì? | Cơ chế bỏ qua các partition không liên quan, giảm bytes quét → giảm chi phí query |
+| Áp dụng cho loại partition nào? | Cả 3 loại: time-unit, ingestion-time, integer-range — nhưng cú pháp lọc khác nhau |
+| Điều kiện để pruning hoạt động? | Cột partition đứng riêng 1 vế so sánh, dùng hằng số hoặc hàm được hỗ trợ, nối `AND` (không `OR`) |
+| Cách đảm bảo mọi query đều pruning? | Bật **Require partition filter** khi tạo bảng |
+| Cách kiểm tra trước khi chạy thật? | Dùng **Dry run** để xem số bytes sẽ quét |
 
