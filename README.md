@@ -11,7 +11,7 @@
 - [6. Explorer & Classic Explorer — Kiểm tra Dataset và thêm dữ liệu](#6-explorer--classic-explorer--kiểm-tra-dataset-và-thêm-dữ-liệu)
   - [6.1. Thêm dữ liệu bằng "+ Add Data" (source từ Google Cloud)](#61-thêm-dữ-liệu-bằng--add-data-source-từ-google-cloud)
   - [6.2. Thêm dữ liệu bằng query (source từ Google Cloud)](#62-thêm-dữ-liệu-bằng-query-source-từ-google-cloud)
-  - [6.3. Thêm dữ liệu bằng query (source từ chính kết quả được tạo ra từ query)](#63-thêm-dữ-liệu-bằng-query-source-từ-chính-kết-quả-được-tạo-ra-từ-query)
+  - [6.3. Thêm dữ liệu bằng query CTAS statement (source từ chính kết quả được tạo ra từ query)](#63-thêm-dữ-liệu-bằng-query-ctas-statement-source-từ-chính-kết-quả-được-tạo-ra-từ-query)
 - [📌 Tóm tắt nhanh](#-tóm-tắt-nhanh)
 - [7. Partitioning tables](#7-partitioning-tables)
 - [8. Partition Pruning trong BigQuery](#8-partition-pruning-trong-bigquery)
@@ -151,8 +151,9 @@ format = 'CSV',
 uris = ['gs://sureskills-lab-dev/future-workforce/da-capstone/temp_35_us/state_region_mapping/state_region_*.csv']);
 ```
 
-### 6.3. Thêm dữ liệu bằng query (source từ chính kết quả được tạo ra từ query)
-Tạo bảng loan_with_region bên trong fintech schema
+### 6.3. Thêm dữ liệu bằng query CTAS statement (source từ chính kết quả được tạo ra từ query)
+Tạo bảng loan_with_region bên trong fintech schema, 
+A CTAS statement, or CREATE TABLE AS SELECT statement, is a SQL statement that creates a new table based on the results of a SELECT statement. It is a powerful tool that can be used to create new tables quickly and easily. Tables made with CTAS statements can also be exported easily in BigQuery so that they can be shared with others.
 
 ```sql
 CREATE OR REPLACE TABLE fintech.loan_with_region AS
