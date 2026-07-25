@@ -207,6 +207,11 @@ Partition theo ngày + Cluster theo 2 cột.
 | 105 | 2026-07-02 | C001 | Books | 25 |
 | 106 | 2026-07-02 | C045 | Electronics | 700 |
 
+-------Có 2 cách tạo partition & cluster table:
+a/ Explorer tab để create table: di chuyển đến partition & cluster field (đảm bảo có column phù hợp với partition strategy)
+
+
+b/ classic explorer tab -> query editor
 ```sql
 CREATE TABLE `shop.orders`
 PARTITION BY DATE(order_date)             -- Partition theo ngày
