@@ -38,6 +38,7 @@ Khi tạo external table trỏ tới dữ liệu trong Cloud Storage, định d�
 ---
 
 ## 3. Cách tạo External Table trong BigQuery
+Vị trí tạo query: + query editor tại datawarehouse (nơi cần kết nối với external table)
 
 Cú pháp dùng `CREATE OR REPLACE EXTERNAL TABLE`, khai báo định dạng file (`format`) và đường dẫn tới dữ liệu nguồn (`uris`):
 
